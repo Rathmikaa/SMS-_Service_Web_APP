@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}GCC Property Tax SMS Console{% endblock %}</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%230b3d2e'/%3E%3Ctext x='12' y='17' font-size='13' font-family='Georgia,serif' fill='%23fff' text-anchor='middle'%3EGCC%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0b3d2e;
+    --ink-light: #0f4d3a;
+    --ink-dark: #082a20;
+    --accent: #b5893c;
+    --surface: #fbfaf7;
+  }
+  * { scrollbar-color: #c7d2c9 transparent; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    background: var(--surface);
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(11,61,46,0.05) 1px, transparent 0);
+    background-size: 22px 22px;
+  }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+
+  ::selection { background: #cfe6da; color: var(--ink-dark); }
+
+  a:focus-visible, button:focus-visible, input:focus-visible,
+  select:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  input[type="text"]:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: var(--ink) !important;
+    box-shadow: 0 0 0 3px rgba(11,61,46,0.12);
+  }
+
+  .lift { transition: box-shadow .18s ease, transform .18s ease, border-color .18s ease; }
+  .lift:hover { box-shadow: 0 6px 20px -8px rgba(11,61,46,0.18); }
+
+  ::-webkit-scrollbar { height: 8px; width: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #c7d2c9; border-radius: 8px; }
+  ::-webkit-scrollbar-thumb:hover { background: #a9bcae; }
+
+  nav a { position: relative; }
+  nav a::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: -4px; height: 2px;
+    background: currentColor; transform: scaleX(0); transform-origin: left;
+    transition: transform .15s ease;
+  }
+  nav a:hover::after, nav a.active::after { transform: scaleX(1); }
+
+  @keyframes slide-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .flash-in { animation: slide-in .25s ease-out; }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .lift, .flash-in, nav a::after { transition: none; animation: none; }
+  }
+</style>
+</head>
+<body class="text-slate-800 min-h-screen flex flex-col">
+<header class="bg-[#0b3d2e] text-white shadow-sm sticky top-0 z-20 border-b border-black/10">
+  <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-md bg-white/10 border border-white/15 flex items-center justify-center text-xs font-semibold tracking-tight shrink-0">
+        GCC
+      </div>
+      <div>
+        <p class="text-[11px] uppercase tracking-widest text-emerald-200/80 leading-none mb-1">Greater Chennai Corporation &middot; Zone 13</p>
+        <h1 class="text-lg font-semibold leading-none">Property Tax SMS Console</h1>
+      </div>
+    </div>
+    <nav class="flex gap-6 text-sm text-emerald-50/90">
+      <a href="{{ url_for('index') }}" class="hover:text-white transition-colors {{ 'active text-white' if request.endpoint == 'index' }}">Dashboard</a>
+      <a href="{{ url_for('logs') }}" class="hover:text-white transition-colors {{ 'active text-white' if request.endpoint == 'logs' }}">Send Log</a>
+      <a href="{{ url_for('export_csv') }}" class="hover:text-white transition-colors">Export CSV</a>
+    </nav>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-6 py-6 w-full flex-1">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="flash-in mb-4 px-4 py-3 rounded-lg text-sm border flex items-start gap-2.5 shadow-sm
+          {{ 'bg-red-50 text-red-800 border-red-200' if category=='error' else 'bg-emerald-50 text-emerald-800 border-emerald-200' }}">
+          <span class="mt-0.5">{{ '⚠' if category == 'error' else '✓' }}</span>
+          <span class="flex-1">{{ message }}</span>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="max-w-7xl mx-auto px-6 py-8 text-xs text-slate-400 w-full">
+  Internal tool &middot; verify DLT/TRAI compliance before sending real bulk SMS &middot; not affiliated with GCC's official systems.
+</footer>
+</body>
+</html>

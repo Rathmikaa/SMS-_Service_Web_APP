@@ -1,0 +1,467 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Stats -->
+<div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+  <div class="lift bg-white rounded-lg border border-slate-200 p-4">
+    <p class="text-xs text-slate-500 flex items-center gap-1.5"><span class="text-slate-400">▤</span> Total records</p>
+    <p class="text-2xl font-semibold mt-1">{{ stats.total }}</p>
+  </div>
+  <div class="lift bg-white rounded-lg border border-slate-200 p-4">
+    <p class="text-xs text-slate-500 flex items-center gap-1.5"><span class="text-emerald-500">✆</span> Have mobile no.</p>
+    <p class="text-2xl font-semibold mt-1 text-emerald-700">{{ stats.with_mobile }}</p>
+  </div>
+  <div class="lift bg-white rounded-lg border border-slate-200 p-4">
+    <p class="text-xs text-slate-500 flex items-center gap-1.5"><span class="text-amber-500">✆</span> Missing mobile no.</p>
+    <p class="text-2xl font-semibold mt-1 text-amber-600">{{ stats.missing_mobile }}</p>
+  </div>
+  <div class="lift bg-white rounded-lg border border-slate-200 p-4">
+    <p class="text-xs text-slate-500 flex items-center gap-1.5"><span class="text-slate-400">✉</span> Sent / Failed</p>
+    <p class="text-2xl font-semibold mt-1"><span class="text-emerald-700">{{ stats.sent }}</span> <span class="text-slate-300 font-normal">/</span> <span class="text-red-600">{{ stats.failed }}</span></p>
+  </div>
+  <div class="lift bg-white rounded-lg border border-slate-200 p-4">
+    <p class="text-xs text-slate-500 flex items-center gap-1.5"><span class="text-slate-400">₹</span> Total balance due</p>
+    <p class="text-2xl font-semibold mt-1">₹{{ "{:,}".format(stats.total_balance) }}</p>
+  </div>
+</div>
+
+{% if stats.needs_review %}
+<div class="mb-6 px-4 py-3 rounded-md text-sm bg-amber-50 text-amber-800 border border-amber-200 flex items-center justify-between flex-wrap gap-2">
+  <span>⚠ {{ stats.needs_review }} record(s) have an incomplete-looking bill number (a known quirk of rows that straddle a page break in the source PDF). Review before sending.</span>
+  <a href="{{ url_for('index', review=1) }}" class="underline font-medium">Show only these</a>
+</div>
+{% endif %}
+
+<!-- Upload -->
+<div class="lift bg-white rounded-lg border border-slate-200 p-5 mb-6">
+  <h2 class="font-semibold mb-3 flex items-center gap-2">
+    <span class="w-5 h-5 rounded-full bg-[#0b3d2e] text-white text-[11px] flex items-center justify-center shrink-0">1</span>
+    Upload GCC property tax PDF report(s)
+  </h2>
+  <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data" id="upload-form" class="flex flex-wrap items-center gap-3">
+    <input type="file" name="pdfs" accept=".pdf" multiple required
+      class="text-sm file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-[#0b3d2e] file:text-white file:text-sm file:cursor-pointer file:transition-colors hover:file:bg-[#0f4d3a] cursor-pointer">
+    <button type="submit" id="upload-btn" class="bg-[#0b3d2e] text-white text-sm px-4 py-2 rounded-md hover:bg-[#0f4d3a] transition-colors flex items-center gap-2">
+      <span class="upload-btn-label">Parse &amp; Import</span>
+    </button>
+  </form>
+  <p class="text-xs text-slate-500 mt-2">Duplicate bill numbers across files are automatically merged (a good mobile number is never overwritten by a blank one).</p>
+</div>
+
+<!-- Manual add / edit -->
+<div class="lift bg-white rounded-lg border border-slate-200 mb-6 overflow-hidden">
+  <button type="button" id="manual-toggle" class="w-full flex items-center justify-between p-5 text-left">
+    <h2 class="font-semibold flex items-center gap-2">
+      <span class="w-5 h-5 rounded-full bg-[#0b3d2e] text-white text-[11px] flex items-center justify-center shrink-0">+</span>
+      <span id="manual-title">Add a record manually (for testing SMS with your own data)</span>
+    </h2>
+    <span id="manual-chevron" class="text-slate-400 transition-transform">▾</span>
+  </button>
+
+  <div id="manual-panel" class="hidden px-5 pb-5 border-t border-slate-100 pt-4">
+    <p class="text-xs text-slate-500 mb-3">
+      Use this to punch in a real name/mobile number/amounts and test the actual SMS send end-to-end,
+      without needing a PDF. It's saved as a normal record — filter, preview, and send it just like any other row.
+    </p>
+    <form id="manual-form" method="post" action="{{ url_for('manual_add') }}" class="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <input type="hidden" name="record_id" id="record_id" value="">
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Owner name</label>
+        <input type="text" name="owner_name" id="f_owner_name" class="w-full text-sm border border-slate-300 rounded-md px-2 py-1.5">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Mobile (10-digit)</label>
+        <input type="text" name="mobile" id="f_mobile" placeholder="e.g. 9876543210" class="w-full text-sm border border-slate-300 rounded-md px-2 py-1.5 mono">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Bill number <span class="text-slate-400">(blank = auto)</span></label>
+        <input type="text" name="bill_number" id="f_bill_number" class="w-full text-sm border border-slate-300 rounded-md px-2 py-1.5 mono">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Sl. No</label>
+        <input type="text" name="sl_no" id="f_sl_no" class="w-full text-sm border border-slate-300 rounded-md px-2 py-1.5">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Division no. (dn)</label>
+        <input type="text" name="dn" id="f_dn" class="w-full text-sm border border-slate-300 rounded-md px-2 py-1.5">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">New door no.</label>
+        <input type="text" name="new_door_no" id="f_new_door_no" class="w-full text-sm border border-slate-300 rounded-md px-2 py-1.5">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Old door no.</label>
+        <input type="text" name="old_door_no" id="f_old_door_no" class="w-full text-sm border border-slate-300 rounded-md px-2 py-1.5">
+      </div>
+      <div class="md:col-span-2">
+        <label class="block text-xs text-slate-500 mb-1">Street</label>
+        <input type="text" name="street" id="f_street" class="w-full text-sm border border-slate-300 rounded-md px-2 py-1.5">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Property type</label>
+        <input type="text" name="property_type" id="f_property_type" class="w-full text-sm border border-slate-300 rounded-md px-2 py-1.5">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Property usage</label>
+        <input type="text" name="property_usage" id="f_property_usage" class="w-full text-sm border border-slate-300 rounded-md px-2 py-1.5">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Current tax due (Rs)</label>
+        <input type="text" name="current_tax_due" id="f_current_tax_due" class="w-full text-sm border border-slate-300 rounded-md px-2 py-1.5 mono">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Arrear due (Rs)</label>
+        <input type="text" name="arrear_due" id="f_arrear_due" class="w-full text-sm border border-slate-300 rounded-md px-2 py-1.5 mono">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Balance amount (Rs)</label>
+        <input type="text" name="balance_amount" id="f_balance_amount" class="w-full text-sm border border-slate-300 rounded-md px-2 py-1.5 mono">
+      </div>
+      <div class="md:col-span-2">
+        <label class="block text-xs text-slate-500 mb-1">Remarks</label>
+        <input type="text" name="remarks" id="f_remarks" class="w-full text-sm border border-slate-300 rounded-md px-2 py-1.5">
+      </div>
+      <div class="md:col-span-3 flex items-center gap-2 pt-1">
+        <button type="submit" id="manual-submit" class="bg-[#0b3d2e] text-white text-sm px-4 py-2 rounded-md hover:bg-[#0f4d3a] transition-colors">Save record</button>
+        <button type="button" id="manual-cancel-edit" class="hidden text-sm px-4 py-2 rounded-md border border-slate-300 hover:bg-slate-50 transition-colors">Cancel edit</button>
+      </div>
+    </form>
+  </div>
+</div>
+<!-- Template -->
+<div class="lift bg-white rounded-lg border border-slate-200 p-5 mb-6">
+  <h2 class="font-semibold mb-3 flex items-center gap-2">
+    <span class="w-5 h-5 rounded-full bg-[#0b3d2e] text-white text-[11px] flex items-center justify-center shrink-0">2</span>
+    Message template
+  </h2>
+  <form action="{{ url_for('save_template') }}" method="post" id="template-form">
+    <textarea name="template" id="template" rows="4"
+      class="w-full text-sm border border-slate-300 rounded-md p-3 mono transition-shadow">{{ template }}</textarea>
+    <div class="flex items-center justify-between mt-2 flex-wrap gap-2">
+      <p class="text-xs text-slate-500 leading-relaxed">
+        Placeholders: <span class="mono">{dn} {bill_number} {sl_no} {owner_name} {new_door_no} {old_door_no} {street}
+        {mobile} {property_type} {property_usage} {current_tax_due} {arrear_due} {balance_amount} {remarks}</span>
+      </p>
+      <button type="submit" class="text-sm px-4 py-2 rounded-md border border-slate-300 hover:bg-slate-50 hover:border-slate-400 transition-colors shrink-0">Save template</button>
+    </div>
+  </form>
+  {% if sample_message %}
+  <div class="mt-3 text-xs bg-slate-50 border border-slate-200 rounded-md p-3 leading-relaxed">
+    <span class="text-slate-500 font-medium">Preview (first record):</span> {{ sample_message }}
+  </div>
+  {% endif %}
+</div>
+
+<!-- Provider status -->
+<div class="lift bg-white rounded-lg border border-slate-200 p-5 mb-6 flex items-center justify-between flex-wrap gap-4">
+  <div class="flex-1 min-w-[280px]">
+    <h2 class="font-semibold flex items-center gap-2">
+      <span class="w-5 h-5 rounded-full bg-[#0b3d2e] text-white text-[11px] flex items-center justify-center shrink-0">3</span>
+      SMS provider
+      <span class="text-[11px] font-normal px-2 py-0.5 rounded-full {{ 'bg-emerald-100 text-emerald-700' if provider_name != 'console' else 'bg-slate-100 text-slate-500' }}">
+        {{ provider_name }}
+      </span>
+    </h2>
+    <p class="text-sm text-slate-500 mt-1.5 leading-relaxed">
+      Set the <span class="mono">SMS_PROVIDER</span> env var (console / textbee / fast2sms / msg91 / twilio) and the matching API
+      credentials to send for real. For TextBee, grab your API key and device ID from
+      <a href="https://app.textbee.dev/dashboard" target="_blank" rel="noopener" class="underline decoration-slate-300 hover:decoration-[#0b3d2e] hover:text-[#0b3d2e] transition-colors">app.textbee.dev/dashboard</a>.
+      Until then, "Send" runs as a safe dry-run.
+    </p>
+  </div>
+  <div class="flex items-center gap-2 text-sm bg-slate-50 border border-slate-200 rounded-md px-3 py-2 shrink-0">
+    <label class="flex items-center gap-2 cursor-pointer select-none">
+      <input type="checkbox" id="dry-run" checked class="accent-[#0b3d2e] w-4 h-4 cursor-pointer">
+      Dry-run (don't actually send)
+    </label>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="bg-white rounded-lg border border-slate-200 p-4 mb-4 flex flex-wrap gap-3 items-end">
+  <form method="get" class="flex flex-wrap gap-3 items-end w-full">
+    <div>
+      <label class="block text-xs text-slate-500 mb-1">Mobile number</label>
+      <select name="mobile" class="text-sm border border-slate-300 rounded-md px-2 py-1.5 hover:border-slate-400 transition-colors cursor-pointer">
+        <option value="" {{ "selected" if not filter_mobile }}>All</option>
+        <option value="has" {{ "selected" if filter_mobile=="has" }}>Has mobile</option>
+        <option value="missing" {{ "selected" if filter_mobile=="missing" }}>Missing mobile</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-slate-500 mb-1">Status</label>
+      <select name="status" class="text-sm border border-slate-300 rounded-md px-2 py-1.5 hover:border-slate-400 transition-colors cursor-pointer">
+        <option value="" {{ "selected" if not status }}>All</option>
+        <option value="pending" {{ "selected" if status=="pending" }}>Pending</option>
+        <option value="sent" {{ "selected" if status=="sent" }}>Sent</option>
+        <option value="failed" {{ "selected" if status=="failed" }}>Failed</option>
+      </select>
+    </div>
+    <div class="flex-1 min-w-[200px]">
+      <label class="block text-xs text-slate-500 mb-1">Search name / street / bill no.</label>
+      <input type="text" name="q" value="{{ search }}" placeholder="e.g. Kamaraj Street"
+        class="w-full text-sm border border-slate-300 rounded-md px-2 py-1.5 transition-shadow">
+    </div>
+    <button class="text-sm px-4 py-1.5 rounded-md border border-slate-300 hover:bg-slate-50 hover:border-slate-400 transition-colors">Filter</button>
+    {% if filter_mobile or status or search or review_only %}
+    <a href="{{ url_for('index') }}" class="text-sm px-3 py-1.5 text-slate-400 hover:text-slate-700 transition-colors">Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+<!-- Records + send -->
+<div class="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
+  <div class="p-4 flex items-center justify-between border-b border-slate-200 flex-wrap gap-3 bg-slate-50/60">
+    <div class="flex items-center gap-3">
+      <label class="text-sm flex items-center gap-2 cursor-pointer select-none">
+        <input type="checkbox" id="select-all" class="accent-[#0b3d2e] w-4 h-4 cursor-pointer"> Select all ({{ records|length }} shown)
+      </label>
+      <span id="selected-count" class="text-xs text-slate-500 transition-opacity"></span>
+    </div>
+    <div class="flex items-center gap-2">
+      <button id="preview-btn" class="text-sm px-4 py-2 rounded-md border border-slate-300 hover:bg-slate-50 hover:border-slate-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors" disabled>
+        Preview message(s)
+      </button>
+      <button id="send-btn" class="bg-[#0b3d2e] text-white text-sm px-4 py-2 rounded-md hover:bg-[#0f4d3a] disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2" disabled>
+        <svg id="send-spinner" class="hidden animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+        <span id="send-btn-label">Send SMS to selected</span>
+      </button>
+    </div>
+  </div>
+
+  <div id="preview-panel" class="hidden border-b border-slate-200 bg-slate-50/60 p-4 space-y-2 max-h-72 overflow-y-auto"></div>
+
+  <div id="send-result" class="hidden px-4 py-3 text-sm border-b flex items-center gap-2"></div>
+
+  <div class="overflow-x-auto max-h-[65vh]">
+    <table class="min-w-full text-sm">
+      <thead class="bg-slate-100 text-slate-600 text-xs uppercase sticky top-0 z-10 shadow-[0_1px_0_0_rgba(0,0,0,0.06)]">
+        <tr>
+          <th class="px-3 py-2 text-left"></th>
+          <th class="px-3 py-2 text-left">Sl.No</th>
+          <th class="px-3 py-2 text-left">Bill No.</th>
+          <th class="px-3 py-2 text-left">Owner</th>
+          <th class="px-3 py-2 text-left">Door / Street</th>
+          <th class="px-3 py-2 text-left">Mobile</th>
+          <th class="px-3 py-2 text-right">Balance (Rs)</th>
+          <th class="px-3 py-2 text-left">Status</th>
+          <th class="px-3 py-2 text-left">&nbsp;</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for r in records %}
+        <tr class="hover:bg-slate-50 transition-colors has-[:checked]:bg-emerald-50/60">
+          <td class="px-3 py-2">
+            <input type="checkbox" class="row-check accent-[#0b3d2e] w-4 h-4 cursor-pointer disabled:cursor-not-allowed" value="{{ r.id }}" {{ "disabled" if not r.mobile }}>
+          </td>
+          <td class="px-3 py-2">{{ r.sl_no }}</td>
+          <td class="px-3 py-2 mono text-xs">
+            {{ r.bill_number }}
+            {% if r.needs_review %}<span title="Bill number looks incomplete — verify against the source PDF" class="ml-1 text-amber-600">⚠</span>{% endif %}
+          </td>
+          <td class="px-3 py-2 font-medium text-slate-700">{{ r.owner_name }}</td>
+          <td class="px-3 py-2 text-slate-600">{{ r.new_door_no }}, {{ r.street }}</td>
+          <td class="px-3 py-2 mono">
+            {% if r.mobile %}{{ r.mobile }}{% else %}<span class="text-amber-600 text-xs bg-amber-50 px-1.5 py-0.5 rounded">missing</span>{% endif %}
+          </td>
+          <td class="px-3 py-2 text-right mono">{{ "{:,}".format(r.balance_amount) }}</td>
+          <td class="px-3 py-2">
+            <span class="text-xs px-2 py-0.5 rounded-full font-medium
+              {{ 'bg-emerald-100 text-emerald-700' if r.status=='sent' else 'bg-red-100 text-red-700' if r.status=='failed' else 'bg-slate-100 text-slate-500' }}">
+              {{ r.status }}
+            </span>
+          </td>
+          <td class="px-3 py-2">
+            <button type="button" class="edit-row text-xs text-slate-400 hover:text-[#0b3d2e] transition-colors underline decoration-dotted"
+              data-record="{{ r|tojson|forceescape }}">Edit</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="px-3 py-16 text-center text-slate-400">
+          <div class="flex flex-col items-center gap-2">
+            <span class="text-3xl">📄</span>
+            <span>No records yet — upload a PDF above to get started.</span>
+          </div>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const selectAll = document.getElementById('select-all');
+const rowChecks = () => Array.from(document.querySelectorAll('.row-check'));
+const sendBtn = document.getElementById('send-btn');
+const previewBtn = document.getElementById('preview-btn');
+const sendBtnLabel = document.getElementById('send-btn-label');
+const sendSpinner = document.getElementById('send-spinner');
+const selectedCount = document.getElementById('selected-count');
+const dryRunBox = document.getElementById('dry-run');
+const resultBox = document.getElementById('send-result');
+const previewPanel = document.getElementById('preview-panel');
+
+function refreshSelection() {
+  const checked = rowChecks().filter(c => c.checked);
+  selectedCount.textContent = checked.length ? `${checked.length} selected` : '';
+  sendBtn.disabled = checked.length === 0;
+  previewBtn.disabled = checked.length === 0;
+  previewPanel.classList.add('hidden');
+}
+
+selectAll.addEventListener('change', () => {
+  rowChecks().forEach(c => { if (!c.disabled) c.checked = selectAll.checked; });
+  refreshSelection();
+});
+document.addEventListener('change', (e) => {
+  if (e.target.classList.contains('row-check')) refreshSelection();
+});
+
+// Upload button shows a "Parsing..." state so a big PDF doesn't feel unresponsive.
+const uploadForm = document.getElementById('upload-form');
+if (uploadForm) {
+  uploadForm.addEventListener('submit', () => {
+    const btn = document.getElementById('upload-btn');
+    btn.disabled = true;
+    btn.querySelector('.upload-btn-label').textContent = 'Parsing…';
+    btn.classList.add('opacity-70', 'cursor-not-allowed');
+  });
+}
+
+// --- Manual add / edit record panel ---
+const manualToggle = document.getElementById('manual-toggle');
+const manualPanel = document.getElementById('manual-panel');
+const manualChevron = document.getElementById('manual-chevron');
+const manualForm = document.getElementById('manual-form');
+const manualTitle = document.getElementById('manual-title');
+const manualSubmit = document.getElementById('manual-submit');
+const manualCancelEdit = document.getElementById('manual-cancel-edit');
+const recordIdField = document.getElementById('record_id');
+
+const FIELD_IDS = ['owner_name','mobile','bill_number','sl_no','dn','new_door_no','old_door_no',
+                    'street','property_type','property_usage','current_tax_due','arrear_due',
+                    'balance_amount','remarks'];
+
+function openManualPanel() {
+  manualPanel.classList.remove('hidden');
+  manualChevron.style.transform = 'rotate(180deg)';
+}
+
+manualToggle.addEventListener('click', () => {
+  const isHidden = manualPanel.classList.contains('hidden');
+  if (isHidden) { openManualPanel(); } else {
+    manualPanel.classList.add('hidden');
+    manualChevron.style.transform = '';
+  }
+});
+
+function resetManualForm() {
+  manualForm.reset();
+  recordIdField.value = '';
+  manualForm.action = "{{ url_for('manual_add') }}";
+  manualTitle.textContent = 'Add a record manually (for testing SMS with your own data)';
+  manualSubmit.textContent = 'Save record';
+  manualCancelEdit.classList.add('hidden');
+}
+
+manualCancelEdit.addEventListener('click', resetManualForm);
+
+// Clicking "Edit" on a row loads that record's saved values into the form above.
+document.addEventListener('click', (e) => {
+  if (!e.target.classList.contains('edit-row')) return;
+  const rec = JSON.parse(e.target.dataset.record);
+  FIELD_IDS.forEach(id => {
+    const el = document.getElementById('f_' + id);
+    if (el) el.value = rec[id] ?? '';
+  });
+  recordIdField.value = rec.id;
+  manualForm.action = `/records/${rec.id}/update`;
+  manualTitle.textContent = `Editing bill no ${rec.bill_number}`;
+  manualSubmit.textContent = 'Save changes';
+  manualCancelEdit.classList.remove('hidden');
+  openManualPanel();
+  manualPanel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
+
+// --- Preview: shows the exact rendered message for each selected record
+// before anything gets sent, so you can check real data against the
+// template (and the SMS provider) before committing to a real send. ---
+previewBtn.addEventListener('click', async () => {
+  const ids = rowChecks().filter(c => c.checked).map(c => parseInt(c.value));
+  if (!ids.length) return;
+  const template = document.getElementById('template').value;
+
+  previewBtn.disabled = true;
+  previewBtn.textContent = 'Loading preview…';
+  try {
+    const resp = await fetch("{{ url_for('preview') }}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids, template })
+    });
+    const data = await resp.json();
+    previewPanel.innerHTML = data.previews.map(p => `
+      <div class="bg-white border border-slate-200 rounded-md p-3">
+        <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+          <span class="font-medium text-slate-700">${p.owner_name || '(no name)'}</span>
+          <span class="mono">${p.mobile || 'no mobile'}</span>
+        </div>
+        <div class="text-sm text-slate-700 leading-relaxed">${p.message}</div>
+      </div>
+    `).join('') || '<p class="text-sm text-slate-400">Nothing to preview.</p>';
+    previewPanel.classList.remove('hidden');
+  } catch (err) {
+    previewPanel.innerHTML = `<p class="text-sm text-red-600">Preview failed: ${err}</p>`;
+    previewPanel.classList.remove('hidden');
+  }
+  previewBtn.disabled = false;
+  previewBtn.textContent = 'Preview message(s)';
+});
+
+sendBtn.addEventListener('click', async () => {
+  const ids = rowChecks().filter(c => c.checked).map(c => parseInt(c.value));
+  if (!ids.length) return;
+  const dryRun = dryRunBox.checked;
+  if (!dryRun && !confirm(`This will send REAL SMS to ${ids.length} number(s) via the configured provider. Continue?`)) return;
+
+  sendBtn.disabled = true;
+  sendSpinner.classList.remove('hidden');
+  sendBtnLabel.textContent = 'Sending…';
+  const template = document.getElementById('template').value;
+
+  let data;
+  try {
+    const resp = await fetch("{{ url_for('send') }}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids, template, dry_run: dryRun, throttle_ms: 300 })
+    });
+    data = await resp.json();
+  } catch (err) {
+    resultBox.classList.remove('hidden');
+    resultBox.className = 'px-4 py-3 text-sm border-b flex items-center gap-2 bg-red-50 text-red-800 border-red-200';
+    resultBox.innerHTML = `<span>⚠</span><span>Request failed: ${err}</span>`;
+    sendSpinner.classList.add('hidden');
+    sendBtnLabel.textContent = 'Send SMS to selected';
+    sendBtn.disabled = false;
+    return;
+  }
+
+  resultBox.classList.remove('hidden');
+  const s = data.summary;
+  const failed = s.failed > 0;
+  resultBox.className = 'flash-in px-4 py-3 text-sm border-b flex items-center gap-2 ' +
+    (failed ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200');
+  resultBox.innerHTML = `<span>${failed ? '⚠' : '✓'}</span><span>` +
+    `${data.dry_run ? '<strong>[DRY-RUN]</strong> ' : ''}Provider: <strong>${data.provider}</strong> — ` +
+    `Sent: <strong>${s.sent}</strong>, Failed: <strong>${s.failed}</strong>, Skipped (no mobile): <strong>${s.skipped}</strong></span>`;
+
+  sendSpinner.classList.add('hidden');
+  sendBtnLabel.textContent = 'Send SMS to selected';
+  setTimeout(() => location.reload(), 1500);
+});
+</script>
+{% endblock %}

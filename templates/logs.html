@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+  <h2 class="font-semibold text-lg flex items-center gap-2">
+    <span class="text-slate-400">✉</span> Send log
+  </h2>
+  <p class="text-xs text-slate-500">{{ logs|length }} message(s) recorded</p>
+</div>
+<div class="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
+  <div class="overflow-x-auto max-h-[75vh]">
+    <table class="min-w-full text-sm">
+      <thead class="bg-slate-100 text-slate-600 text-xs uppercase sticky top-0 z-10 shadow-[0_1px_0_0_rgba(0,0,0,0.06)]">
+        <tr>
+          <th class="px-3 py-2 text-left">Time (UTC)</th>
+          <th class="px-3 py-2 text-left">Bill No.</th>
+          <th class="px-3 py-2 text-left">Owner</th>
+          <th class="px-3 py-2 text-left">Mobile</th>
+          <th class="px-3 py-2 text-left">Provider</th>
+          <th class="px-3 py-2 text-left">Result</th>
+          <th class="px-3 py-2 text-left">Message</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for l in logs %}
+        <tr class="hover:bg-slate-50 transition-colors align-top">
+          <td class="px-3 py-2 whitespace-nowrap text-xs text-slate-500 mono">{{ l.sent_at }}</td>
+          <td class="px-3 py-2 mono text-xs">{{ l.bill_number }}</td>
+          <td class="px-3 py-2 font-medium text-slate-700">{{ l.owner_name }}</td>
+          <td class="px-3 py-2 mono">{{ l.mobile }}</td>
+          <td class="px-3 py-2">{{ l.provider }}{% if l.dry_run %} <span class="text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">dry-run</span>{% endif %}</td>
+          <td class="px-3 py-2">
+            <span class="text-xs px-2 py-0.5 rounded-full font-medium {{ 'bg-emerald-100 text-emerald-700' if l.success else 'bg-red-100 text-red-700' }}">
+              {{ 'success' if l.success else 'failed' }}
+            </span>
+          </td>
+          <td class="px-3 py-2 text-xs text-slate-500 max-w-md">{{ l.message }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="px-3 py-16 text-center text-slate-400">
+          <div class="flex flex-col items-center gap-2">
+            <span class="text-3xl">🗒️</span>
+            <span>No messages sent yet.</span>
+          </div>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: gcc-sms-console
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: SMS_PROVIDER
+        value: console
+      - key: DB_PATH
+        value: /var/data/app.db
+    disk:
+      name: gcc-sms-data
+      mountPath: /var/data
+      sizeGB: 1
