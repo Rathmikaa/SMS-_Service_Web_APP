@@ -6,8 +6,8 @@ owners — upload the PDF, review the extracted records, edit the message
 template, select who to message, and send (or dry-run first).
 
 Built and tested against the two report formats you provided:
-- `Vadivelu-TC__Rs_25K_to_Rs_50K_.pdf` (158 rows)
-- `B_172-Vadivelu_Rs_10k_to_Rs_50k_.pdf` (132 rows, 52 overlap with the file
+- ` (158 rows)
+- ` (132 rows, 52 overlap with the file
   above and get merged automatically by bill number — 238 unique records)
 
 ## What it does
